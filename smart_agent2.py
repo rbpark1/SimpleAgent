@@ -17,6 +17,7 @@ _MOVE_SCREEN = actions.FUNCTIONS.Attack_screen.id
 _PLAYER_RELATIVE = features.SCREEN_FEATURES.player_relative.index
 
 # values
+_BACKGROUND = 0
 _PLAYER_SELF = 1
 _PLAYER_NEUTRAL = 3
 _SELECT_ALL = [0]
@@ -26,12 +27,13 @@ _NOT_QUEUED = [0]
 ACTION_DO_NOTHING = 'donothing'
 ACTION_SELECT_ARMY = 'selectarmy'
 ACTION_MOVE_SCREEN = 'movescreen'
-ACTION_SELECT_POINT = 'selectpoint'
+ACTION_SELECT_POINT = 'selectpoint' # deselect marine
 
 smart_actions = [
     ACTION_DO_NOTHING,
     ACTION_SELECT_ARMY,
-    ACTION_MOVE_SCREEN
+    ACTION_MOVE_SCREEN,
+    ACTION_SELECT_POINT
 ]
 
 # Stolen from https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow
@@ -98,7 +100,35 @@ class SmartAgent(base_agent.BaseAgent):
                          beacon_x.mean(),
                          beacon_y.mean()]
 
-        
+        if self.previous_action is not None:
+            self.qlearn.learn(str(self.previous_state), self.previous_action, obs.reward, str(current_state))
+
+        rl_action = self.qlearn.choose_action(str(current_state))
+        smart_action = smart_actions[rl_action]
+
+        self.previous_state = current_state
+        self.previous_action = rl_action
+
+        if smart_action == ACTION_DO_NOTHING:
+            return actions.FunctionCall(_NO_OP, [])
+        elif smart_action == ACTION_SELECT_ARMY:
+            if _SELECT_ARMY in obs.observation['available_actions']:
+                return actions.FunctionCall(_SELECT_ARMY, [_NOT_QUEUED])
+        elif smart_action == ACTION_SELECT_POINT:
+            if _SELECT_POINT in obs.observation['available_actions']:
+                background_x, background_y = (obs.observation['screen'][_PLAYER_RELATIVE] == _BACKGROUND).nonzero()
+                x_index = np.random.randint(0, len(background_x))
+                y_index = np.random.randint(0, len(background_y))
+                point_x = background_x[x_index]
+                point_y = background_y[y_index]
+
+                return actions.FunctionCall(_SELECT_POINT, [_NOT_QUEUED, [point_y, point_x]])
+        elif smart_action == ACTION_MOVE_SCREEN:
+            if _MOVE_SCREEN in obs.observation["available_actions"]:
+                return actions.FunctionCall(_MOVE_SCREEN, [_NOT_QUEUED, [beacon_y.mean(), beacon_x.mean()]])
+
+        return actions.FunctionCall(_NO_OP, [])
+
 
 
 
