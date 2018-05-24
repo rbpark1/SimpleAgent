@@ -1,3 +1,5 @@
+# run with "python -m pysc2.bin.agent --map MoveToBeacon --agent smart_agent2.SmartAgent --agent_race T --max_agent_steps 0 --norender"
+
 import random
 
 import numpy as np
@@ -28,12 +30,20 @@ ACTION_DO_NOTHING = 'donothing'
 ACTION_SELECT_ARMY = 'selectarmy'
 ACTION_MOVE_SCREEN = 'movescreen'
 ACTION_SELECT_POINT = 'selectpoint' # deselect marine
+UP = 'up'
+LEFT = 'left'
+RIGHT = 'right'
+DOWN = 'down'
+
 
 smart_actions = [
     ACTION_DO_NOTHING,
     ACTION_SELECT_ARMY,
-    ACTION_MOVE_SCREEN,
-    ACTION_SELECT_POINT
+    ACTION_SELECT_POINT,
+    UP,
+    LEFT,
+    RIGHT,
+    DOWN
 ]
 
 # Stolen from https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow
@@ -89,6 +99,7 @@ class SmartAgent(base_agent.BaseAgent):
         self.previous_action = None
         self.previous_state = None
 
+        # track reward
         total_reward = 0
 
     def step(self, obs):
@@ -102,7 +113,8 @@ class SmartAgent(base_agent.BaseAgent):
                          beacon_x.mean(),
                          beacon_y.mean()]
 
-        total_reward += 0
+        # calculate reward
+        total_reward += obs.reward * 100 + 1 / (player_x.mean() - beacon_x.mean() ) + 1 / (player_y.mean() - beacon_y.mean() )
 
         if self.previous_action is not None:
             self.qlearn.learn(str(self.previous_state), self.previous_action, total_reward, str(current_state))
@@ -127,11 +139,21 @@ class SmartAgent(base_agent.BaseAgent):
                 point_y = background_y[y_index]
 
                 return actions.FunctionCall(_SELECT_POINT, [_NOT_QUEUED, [point_y, point_x]])
-        elif smart_action == ACTION_MOVE_SCREEN:
-            if _MOVE_SCREEN in obs.observation["available_actions"]:
-                return actions.FunctionCall(_MOVE_SCREEN, [_NOT_QUEUED, [beacon_y.mean(), beacon_x.mean()]])
+        elif smart_action == UP:
+            if _MOVE_SCREEN in obs.observation["available_actions"] and player_y.mean() < 32:
+                return actions.FunctionCall(_MOVE_SCREEN, [_NOT_QUEUED, [player_x.mean(), player_y.mean() + 1]])
+        elif smart_action == DOWN:
+            if _MOVE_SCREEN in obs.observation["available_actions"] and player_y.mean() > 0:
+                return actions.FunctionCall(_MOVE_SCREEN, [_NOT_QUEUED, [player_x.mean(), player_y.mean() - 1]])
+        elif smart_action == LEFT:
+            if _MOVE_SCREEN in obs.observation["available_actions"] and player_x.mean() > 0:
+                return actions.FunctionCall(_MOVE_SCREEN, [_NOT_QUEUED, [player_x.mean() - 1, player_y.mean()]])
+        elif smart_action == RIGHT:
+            if _MOVE_SCREEN in obs.observation["available_actions"] and player_x.mean() < 32:
+                return actions.FunctionCall(_MOVE_SCREEN, [_NOT_QUEUED, [player_x.mean() + 1, player_y.mean()]])
 
         return actions.FunctionCall(_NO_OP, [])
+
 
 
 
